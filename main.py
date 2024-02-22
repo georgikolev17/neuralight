@@ -6,13 +6,14 @@ import sumo_rl
 import random
 import numpy as np
 import torch
+from matplotlib import pylab as plt
 
 from agents.ql_agent import QlAgent
 
 env = sumo_rl.SumoEnvironment(net_file='nets/grid4x4/grid4x4.net.xml',
                   route_file='nets/grid4x4/grid4x4_1.rou.xml',
                   use_gui=True,
-                  num_seconds=3600,
+                  num_seconds=20000,
                   single_agent=False)
 observations = env.reset()
 
@@ -36,8 +37,8 @@ neighbours = {ts: numpy.array(neighbours[ts]) for ts in env.traffic_signals}
 print(neighbours)
 
 epochs = 5
-epsilon=1
-gamma=0.9
+epsilon = 1
+gamma = 0.9
 
 ql_agents = {
     ts: QlAgent()
@@ -45,29 +46,50 @@ ql_agents = {
 }
 
 for i in range(epochs):
-    observations = env.reset()
     done = {"__all__": False}
     i=0
+    avg_rewards = []
+    input_data = {}
+    for ts in observations:
+        concatenated_array = np.concatenate([observations[n] for n in neighbours[ts]] + [observations[ts]])
+        if len(concatenated_array) < 165:
+            padded_array = np.concatenate((concatenated_array, np.full(165 - len(concatenated_array), -1)))
+        else:
+            padded_array = concatenated_array[:165]
+        input_data[ts] = torch.Tensor(padded_array).to(torch.float)
     while not done["__all__"]:
-        input_data = {}
+        i += 1
+        pred_rewards = {ts: ql_agents[ts].predict_rewards(input_data[ts]) for ts in env.traffic_signals}
+        actions = {
+            agent:
+                random.randint(0, 7) if random.random() < epsilon
+                else torch.argmax(pred_rewards[agent], dim=0).item()
+            for agent in env.traffic_signals
+        }
+        observations, rewards, done, infos = env.step(actions)
+
+        input_data2 = {}
         for ts in observations:
             concatenated_array = np.concatenate([observations[n] for n in neighbours[ts]] + [observations[ts]])
             if len(concatenated_array) < 165:
                 padded_array = np.concatenate((concatenated_array, np.full(165 - len(concatenated_array), -1)))
             else:
                 padded_array = concatenated_array[:165]
-            input_data[ts] = torch.tensor(padded_array).to(torch.float)
-
-        print(input_data['A1'].shape)
-        print(len(input_data['A1']))
-        pred_rewards = {ts: ql_agents[ts].predict_rewards(input_data[ts]) for ts in env.traffic_signals}
-        print(pred_rewards)
-        actions = {
-            agent:
-                random.randint(0, 7) if random.random() < epsilon
-                else torch.argmax(pred_rewards[agent], dim=1).item()
-            for agent in env.traffic_signals
-        }
-        print(actions)
-        observations, rewards, done, infos = env.step(actions)
-    # print(np.average(np.array(list(rewards.values()))))
+            input_data2[ts] = torch.Tensor(padded_array).to(torch.float)
+        with torch.no_grad():
+            q_rewards = {ts: rewards[ts] + gamma * torch.max(ql_agents[ts].predict_rewards(input_data2[ts])) for ts in env.traffic_signals}
+        avg_reward = sum(rewards.values())/len(rewards)
+        avg_rewards.append(avg_reward)
+        print(f'{i} {sum(rewards.values())/len(rewards)}')
+        for ts in env.traffic_signals:
+            ql_agents[ts].learn(torch.Tensor(pred_rewards[ts][actions[ts]]), torch.Tensor([q_rewards[ts]]))
+        if epsilon > 0.1:
+            epsilon -= 1/720
+        input_data = input_data2
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel("Epochs")
+    ax.set_ylabel("Avg Reward")
+    fig.set_size_inches(9, 5)
+    ax.scatter(np.arange(len(avg_rewards)), avg_rewards)
+    plt.show()
+    observations = env.reset()
