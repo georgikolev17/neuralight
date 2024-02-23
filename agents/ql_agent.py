@@ -32,6 +32,13 @@ class QlAgent:
         loss.backward()
         self.optimizer.step()
 
+    def get_params(self):
+        return self.model.parameters()
+
+    def set_params(self, params):
+        for i, param in enumerate(params):
+            self.model[i].weight.data = param.clone().detach()
+
 
 
 

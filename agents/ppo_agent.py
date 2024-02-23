@@ -79,8 +79,8 @@ class PPO:
 # Training
 def train(hidden_size=64, lr=3e-4, gamma=0.99, clip_ratio=0.2, K_epoch=10, max_steps=100,
           max_episodes=100):
-    base_env = sumo_rl.SumoEnvironment(net_file='nets/grid4x4/grid4x4.net.xml',
-                                       route_file='nets/grid4x4/grid4x4_1.rou.xml',
+    base_env = sumo_rl.SumoEnvironment(net_file='../nets/grid4x4/grid4x4.net.xml',
+                                       route_file='../nets/grid4x4/grid4x4_1.rou.xml',
                                        use_gui=False,
                                        num_seconds=1000,
                                        single_agent=True)
