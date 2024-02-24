@@ -83,24 +83,15 @@ while not done["__all__"]:
     avg_reward = sum(rewards.values())/len(rewards)
     avg_rewards.append(avg_reward)
     print(f'{i} {sum(rewards.values())/len(rewards)}')
+    if i > 100:
+        break
     for ts in env.traffic_signals:
         ql_agents[ts].learn(torch.Tensor(pred_rewards[ts][actions[ts]]), torch.Tensor([q_rewards[ts]]))
     if epsilon > 0.1:
         epsilon -= 1/1500
     input_data = input_data2
-    if i > 10000 or (i > 1500 and avg_reward == 0):
-        break
-    # # Average the parameters of all agents
-    # all_params = []
-    # for agent in ql_agents.values():
-    #     with torch.no_grad():
-    #         all_params.extend(torch.tensor(agent.get_params()).detach())
-    # print(all_params)
-    # avg_params = np.array(all_params)
-    # avg_params = torch.from_numpy(np.mean(avg_params, axis=0))
-    # print(avg_params)
-    # for agent in ql_agents.values():
-    #     agent.set_params(avg_params)
+for agent in env.traffic_signals:
+    torch.save(ql_agents[agent].model.state_dict(), f'trained_models/model{agent}.pth')
 fig, ax = plt.subplots(1, 1)
 ax.set_xlabel("Epochs")
 ax.set_ylabel("Avg Reward")

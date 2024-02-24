@@ -40,9 +40,6 @@ class QlAgent:
             self.model[i].weight.data = param.clone().detach()
 
 
-
-
-
 # Define input and output sizes
 input_Size = 33*5
 output_Size = 2**15
